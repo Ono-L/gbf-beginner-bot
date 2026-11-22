@@ -56,6 +56,21 @@ const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
     label: "フェス待ち（レジェフェス・グラフェス）",
     keywords: ["フェス", "レジェンドフェス", "グランデフェス", "レジェフェス", "グラフェス"],
   },
+  {
+    key: "gw_flow",
+    label: "古戦場の全体スケジュールと基本の流れ",
+    keywords: ["全体スケジュール", "古戦場の全体", "予選", "インターバル"],
+  },
+  {
+    key: "dancho_prep",
+    label: "古戦場開催前の団長・副団長の準備",
+    keywords: ["開催前に団長", "団長・副団長", "騎空艇", "団サポ"],
+  },
+  {
+    key: "dancho_battle",
+    label: "本戦での団アビ管理と撤退・勝負の判断",
+    keywords: ["団アビ管理", "撤退", "勝負の判断", "時速"],
+  },
 ];
 
 let cachedAllChunks: readonly KnowledgeChunk[] | null = null;
@@ -95,7 +110,8 @@ export function buildGuideReply(topic?: string): string {
   const guideChunks = chunks.filter(
     (chunk) =>
       chunk.sourceFile === "01_beginner_roadmap.md" ||
-      chunk.sourceFile === "02_items_and_gacha.md",
+      chunk.sourceFile === "02_items_and_gacha.md" ||
+      chunk.sourceFile === "04_guild_war_and_dancho.md",
   );
 
   if (topic === undefined || topic.trim().length === 0) {
