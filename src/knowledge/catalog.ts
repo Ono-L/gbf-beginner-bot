@@ -71,6 +71,21 @@ const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
     label: "本戦での団アビ管理と撤退・勝負の判断",
     keywords: ["団アビ管理", "撤退", "勝負の判断", "時速"],
   },
+  {
+    key: "grid_build",
+    label: "編成（構成）の基本的な組み方",
+    keywords: ["編成（構成）の基本", "役割分担", "攻刃枠"],
+  },
+  {
+    key: "damage_calc",
+    label: "ダメージ計算の基本仕組み（乗算と減衰）",
+    keywords: ["ダメージ計算", "乗算", "減衰", "防御下限"],
+  },
+  {
+    key: "pred_damage",
+    label: "予測ダメージの見方と注意点（主人公のみ基準）",
+    keywords: ["予測ダメージ", "ダメージ予想", "主人公のみ", "トライアルバトル"],
+  },
 ];
 
 let cachedAllChunks: readonly KnowledgeChunk[] | null = null;
@@ -111,7 +126,8 @@ export function buildGuideReply(topic?: string): string {
     (chunk) =>
       chunk.sourceFile === "01_beginner_roadmap.md" ||
       chunk.sourceFile === "02_items_and_gacha.md" ||
-      chunk.sourceFile === "04_guild_war_and_dancho.md",
+      chunk.sourceFile === "04_guild_war_and_dancho.md" ||
+      chunk.sourceFile === "05_grid_and_damage.md",
   );
 
   if (topic === undefined || topic.trim().length === 0) {
