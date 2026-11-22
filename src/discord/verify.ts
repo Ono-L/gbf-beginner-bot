@@ -10,11 +10,40 @@
  * ネイティブで Ed25519 をサポートしているため、外部依存なしで安全に検証できます。
  */
 
+/** 署名タイムスタンプの許容誤差（秒）。リプレイ攻撃対策としてデフォルト ±5 分以内のみ許可 */
+export const DEFAULT_MAX_TIMESTAMP_AGE_SECONDS = 300;
+
 export interface VerifyDiscordRequestParams {
   readonly publicKeyHex: string;
   readonly signatureHex: string | null;
   readonly timestamp: string | null;
   readonly rawBody: string;
+  /** タイムスタンプの許容誤差（秒）。未指定時は DEFAULT_MAX_TIMESTAMP_AGE_SECONDS (300秒) */
+  readonly maxTimestampAgeSeconds?: number;
+  /** 現在時刻（ミリ秒）。テスト時に時刻を固定するために指定可能 */
+  readonly nowMs?: number;
+}
+
+/**
+ * X-Signature-Timestamp（Unix 秒）の形式と鮮度を検証する。
+ * 数値以外の文字列や、現在時刻から許容誤差を超えた古い・未来のタイムスタンプは false を返す。
+ */
+export function isFreshDiscordTimestamp(
+  timestamp: string,
+  maxAgeSeconds: number = DEFAULT_MAX_TIMESTAMP_AGE_SECONDS,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!/^\d+$/.test(timestamp)) {
+    return false;
+  }
+
+  const timestampSec = Number(timestamp);
+  if (!Number.isSafeInteger(timestampSec)) {
+    return false;
+  }
+
+  const nowSec = Math.floor(nowMs / 1000);
+  return Math.abs(nowSec - timestampSec) <= maxAgeSeconds;
 }
 
 /**
@@ -53,9 +82,20 @@ export function hexToBytes(
 export async function verifyDiscordSignature(
   params: VerifyDiscordRequestParams,
 ): Promise<boolean> {
-  const { publicKeyHex, signatureHex, timestamp, rawBody } = params;
+  const {
+    publicKeyHex,
+    signatureHex,
+    timestamp,
+    rawBody,
+    maxTimestampAgeSeconds = DEFAULT_MAX_TIMESTAMP_AGE_SECONDS,
+    nowMs = Date.now(),
+  } = params;
 
   if (signatureHex === null || timestamp === null || timestamp.length === 0) {
+    return false;
+  }
+
+  if (!isFreshDiscordTimestamp(timestamp, maxTimestampAgeSeconds, nowMs)) {
     return false;
   }
 

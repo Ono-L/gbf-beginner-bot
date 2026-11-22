@@ -2,10 +2,20 @@ import type { ExecutionContext as HonoExecutionContext } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/index.js";
 import {
+  MAX_ASK_QUESTION_LENGTH,
+  MAX_WORD_TERM_LENGTH,
+} from "../src/discord/commands.js";
+import {
+  INTERACTION_RESPONSE_FLAGS,
   INTERACTION_RESPONSE_TYPE,
   INTERACTION_TYPE,
 } from "../src/discord/types.js";
+import { DEFAULT_MAX_TIMESTAMP_AGE_SECONDS } from "../src/discord/verify.js";
 import type { AppEnv } from "../src/types/env.js";
+
+/** テスト全体で共有する固定基準時刻（Unix 秒: 1700000000） */
+const FIXED_NOW_SEC = 1_700_000_000;
+const FIXED_NOW_MS = FIXED_NOW_SEC * 1000;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -72,7 +82,7 @@ function createMockExecutionContext(): {
 describe("POST /interactions", () => {
   it("署名ヘッダ欠落や不正署名の場合は 401 を返す", async () => {
     const { publicKeyHex } = await createTestKeyPair();
-    const app = createApp();
+    const app = createApp({ now: () => FIXED_NOW_MS });
     const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
     const { ctx } = createMockExecutionContext();
 
@@ -95,7 +105,7 @@ describe("POST /interactions", () => {
         headers: {
           "Content-Type": "application/json",
           "X-Signature-Ed25519": "00".repeat(64),
-          "X-Signature-Timestamp": "1700000000",
+          "X-Signature-Timestamp": String(FIXED_NOW_SEC),
         },
         body: JSON.stringify({ type: INTERACTION_TYPE.PING }),
       }),
@@ -105,14 +115,50 @@ describe("POST /interactions", () => {
     expect(resInvalid.status).toBe(401);
   });
 
+  it("署名が正しくてもタイムスタンプが古すぎる・未来すぎる・非数値の場合は 401 を返す", async () => {
+    const { publicKeyHex, sign } = await createTestKeyPair();
+    const app = createApp({ now: () => FIXED_NOW_MS });
+    const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
+    const { ctx } = createMockExecutionContext();
+    const body = JSON.stringify({ type: INTERACTION_TYPE.PING });
+
+    const invalidTimestamps = [
+      String(FIXED_NOW_SEC - DEFAULT_MAX_TIMESTAMP_AGE_SECONDS - 1),
+      String(FIXED_NOW_SEC + DEFAULT_MAX_TIMESTAMP_AGE_SECONDS + 1),
+      "not-a-number",
+    ];
+
+    for (const timestamp of invalidTimestamps) {
+      const signature = await sign(timestamp, body);
+      const res = await app.fetch(
+        new Request("http://localhost/interactions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Signature-Ed25519": signature,
+            "X-Signature-Timestamp": timestamp,
+          },
+          body,
+        }),
+        env,
+        ctx,
+      );
+      expect(res.status).toBe(401);
+    }
+  });
+
   it("正常な署名の PING に対して PONG ({ type: 1 }) を返す", async () => {
     const { publicKeyHex, sign } = await createTestKeyPair();
-    const app = createApp();
-    const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
+    const app = createApp({ now: () => FIXED_NOW_MS });
+    const env: AppEnv = {
+      DISCORD_PUBLIC_KEY: publicKeyHex,
+      // PING には guild_id がないため、ALLOWED_GUILD_IDS 設定時でも PONG が返ること
+      ALLOWED_GUILD_IDS: "guild-allowed-1",
+    };
     const { ctx } = createMockExecutionContext();
 
     const body = JSON.stringify({ type: INTERACTION_TYPE.PING });
-    const timestamp = "1700000001";
+    const timestamp = String(FIXED_NOW_SEC + 1);
     const signature = await sign(timestamp, body);
 
     const res = await app.fetch(
@@ -133,9 +179,9 @@ describe("POST /interactions", () => {
     expect(await res.json()).toEqual({ type: INTERACTION_RESPONSE_TYPE.PONG });
   });
 
-  it("/guide と /word はナレッジから即時応答 (type: 4) を返す", async () => {
+  it("/guide と /word はナレッジから即時応答 (type: 4, メンション無効) を返す", async () => {
     const { publicKeyHex, sign } = await createTestKeyPair();
-    const app = createApp();
+    const app = createApp({ now: () => FIXED_NOW_MS });
     const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
     const { ctx } = createMockExecutionContext();
 
@@ -147,7 +193,7 @@ describe("POST /interactions", () => {
         options: [{ name: "topic", type: 3, value: "shero" }],
       },
     });
-    const guideTs = "1700000002";
+    const guideTs = String(FIXED_NOW_SEC + 2);
     const guideRes = await app.fetch(
       new Request("http://localhost/interactions", {
         method: "POST",
@@ -164,10 +210,11 @@ describe("POST /interactions", () => {
     expect(guideRes.status).toBe(200);
     const guideJson = (await guideRes.json()) as {
       type: number;
-      data: { content: string };
+      data: { content: string; allowed_mentions: { parse: string[] } };
     };
     expect(guideJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
     expect(guideJson.data.content).toContain("シェロカルテの特別訓練");
+    expect(guideJson.data.allowed_mentions).toEqual({ parse: [] });
 
     // /word (term=古戦場)
     const wordBody = JSON.stringify({
@@ -177,7 +224,7 @@ describe("POST /interactions", () => {
         options: [{ name: "term", type: 3, value: "古戦場" }],
       },
     });
-    const wordTs = "1700000003";
+    const wordTs = String(FIXED_NOW_SEC + 3);
     const wordRes = await app.fetch(
       new Request("http://localhost/interactions", {
         method: "POST",
@@ -194,19 +241,21 @@ describe("POST /interactions", () => {
     expect(wordRes.status).toBe(200);
     const wordJson = (await wordRes.json()) as {
       type: number;
-      data: { content: string };
+      data: { content: string; allowed_mentions: { parse: string[] } };
     };
     expect(wordJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
     expect(wordJson.data.content).toContain("決戦！星の古戦場");
+    expect(wordJson.data.allowed_mentions).toEqual({ parse: [] });
   });
 
-  it("/ask は即座に Deferred (type: 5) を返し、waitUntil で RAG 回答を Webhook PATCH で更新する", async () => {
+  it("/ask は即座に Deferred (type: 5) を返し、waitUntil で RAG 回答をメンション無効の Webhook PATCH で更新する", async () => {
     const { publicKeyHex, sign } = await createTestKeyPair();
     const webhookFetch = vi.fn<typeof fetch>(async () => {
       return new Response(JSON.stringify({ id: "msg-1" }), { status: 200 });
     });
 
     const app = createApp({
+      now: () => FIXED_NOW_MS,
       createRetriever: () => ({
         retrieve: vi.fn(async () => [
           {
@@ -230,19 +279,23 @@ describe("POST /interactions", () => {
       fetchImpl: webhookFetch,
     });
 
-    const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
+    const env: AppEnv = {
+      DISCORD_PUBLIC_KEY: publicKeyHex,
+      ALLOWED_GUILD_IDS: "guild-allowed-1, guild-allowed-2",
+    };
     const { ctx, waitForAll } = createMockExecutionContext();
 
     const askBody = JSON.stringify({
       type: INTERACTION_TYPE.APPLICATION_COMMAND,
       application_id: "app-12345",
+      guild_id: "guild-allowed-2",
       token: "interaction-token-xyz",
       data: {
         name: "ask",
         options: [{ name: "question", type: 3, value: "天井って何連ですか？" }],
       },
     });
-    const ts = "1700000004";
+    const ts = String(FIXED_NOW_SEC + 4);
     const res = await app.fetch(
       new Request("http://localhost/interactions", {
         method: "POST",
@@ -271,8 +324,185 @@ describe("POST /interactions", () => {
       "https://discord.com/api/v10/webhooks/app-12345/interaction-token-xyz/messages/@original",
     );
     expect(calledInit?.method).toBe("PATCH");
-    const sentPayload = JSON.parse(String(calledInit?.body)) as { content: string };
+    const sentPayload = JSON.parse(String(calledInit?.body)) as {
+      content: string;
+      allowed_mentions: { parse: string[] };
+    };
     expect(sentPayload.content).toContain("300連");
     expect(sentPayload.content).toContain("ガチャと天井（300連）の基本ルール");
+    expect(sentPayload.allowed_mentions).toEqual({ parse: [] });
+  });
+
+  it("ALLOWED_GUILD_IDS が設定されている場合、未許可サーバーや DM からの実行は RAG を呼ばずに拒否する", async () => {
+    const { publicKeyHex, sign } = await createTestKeyPair();
+    const retrieveMock = vi.fn(async () => []);
+    const generateMock = vi.fn(async () => "dummy");
+    const app = createApp({
+      now: () => FIXED_NOW_MS,
+      createRetriever: () => ({ retrieve: retrieveMock }),
+      createGenerator: () => ({ generate: generateMock }),
+    });
+    const env: AppEnv = {
+      DISCORD_PUBLIC_KEY: publicKeyHex,
+      ALLOWED_GUILD_IDS: "guild-allowed-1",
+    };
+    const { ctx, waitForAll } = createMockExecutionContext();
+
+    const rejectedPayloads = [
+      // 未許可サーバー
+      JSON.stringify({
+        type: INTERACTION_TYPE.APPLICATION_COMMAND,
+        guild_id: "guild-unknown-999",
+        data: {
+          name: "ask",
+          options: [{ name: "question", type: 3, value: "天井は何連？" }],
+        },
+      }),
+      // DM（guild_id なし）
+      JSON.stringify({
+        type: INTERACTION_TYPE.APPLICATION_COMMAND,
+        data: {
+          name: "guide",
+        },
+      }),
+    ];
+
+    for (const body of rejectedPayloads) {
+      const ts = String(FIXED_NOW_SEC + 5);
+      const res = await app.fetch(
+        new Request("http://localhost/interactions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Signature-Ed25519": await sign(ts, body),
+            "X-Signature-Timestamp": ts,
+          },
+          body,
+        }),
+        env,
+        ctx,
+      );
+
+      expect(res.status).toBe(200);
+      const json = (await res.json()) as {
+        type: number;
+        data: {
+          content: string;
+          flags: number;
+          allowed_mentions: { parse: string[] };
+        };
+      };
+      expect(json.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
+      expect(json.data.flags).toBe(INTERACTION_RESPONSE_FLAGS.EPHEMERAL);
+      expect(json.data.content).toContain("許可されたサーバー");
+      expect(json.data.allowed_mentions).toEqual({ parse: [] });
+    }
+
+    await waitForAll();
+    expect(retrieveMock).not.toHaveBeenCalled();
+    expect(generateMock).not.toHaveBeenCalled();
+  });
+
+  it("/ask と /word で文字数上限を超えた入力はバックグラウンド処理せず即時エラーを返す", async () => {
+    const { publicKeyHex, sign } = await createTestKeyPair();
+    const retrieveMock = vi.fn(async () => []);
+    const generateMock = vi.fn(async () => "dummy");
+    const app = createApp({
+      now: () => FIXED_NOW_MS,
+      createRetriever: () => ({ retrieve: retrieveMock }),
+      createGenerator: () => ({ generate: generateMock }),
+    });
+    const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
+    const { ctx, waitForAll } = createMockExecutionContext();
+
+    // /ask: 上限 + 1 文字
+    const longAskBody = JSON.stringify({
+      type: INTERACTION_TYPE.APPLICATION_COMMAND,
+      application_id: "app-12345",
+      token: "tok",
+      data: {
+        name: "ask",
+        options: [
+          {
+            name: "question",
+            type: 3,
+            value: "あ".repeat(MAX_ASK_QUESTION_LENGTH + 1),
+          },
+        ],
+      },
+    });
+    const askTs = String(FIXED_NOW_SEC + 6);
+    const askRes = await app.fetch(
+      new Request("http://localhost/interactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature-Ed25519": await sign(askTs, longAskBody),
+          "X-Signature-Timestamp": askTs,
+        },
+        body: longAskBody,
+      }),
+      env,
+      ctx,
+    );
+    expect(askRes.status).toBe(200);
+    const askJson = (await askRes.json()) as {
+      type: number;
+      data: {
+        content: string;
+        flags: number;
+        allowed_mentions: { parse: string[] };
+      };
+    };
+    expect(askJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
+    expect(askJson.data.flags).toBe(INTERACTION_RESPONSE_FLAGS.EPHEMERAL);
+    expect(askJson.data.content).toContain(`${String(MAX_ASK_QUESTION_LENGTH)} 文字以内`);
+    expect(askJson.data.allowed_mentions).toEqual({ parse: [] });
+
+    // /word: 上限 + 1 文字
+    const longWordBody = JSON.stringify({
+      type: INTERACTION_TYPE.APPLICATION_COMMAND,
+      data: {
+        name: "word",
+        options: [
+          {
+            name: "term",
+            type: 3,
+            value: "い".repeat(MAX_WORD_TERM_LENGTH + 1),
+          },
+        ],
+      },
+    });
+    const wordTs = String(FIXED_NOW_SEC + 7);
+    const wordRes = await app.fetch(
+      new Request("http://localhost/interactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature-Ed25519": await sign(wordTs, longWordBody),
+          "X-Signature-Timestamp": wordTs,
+        },
+        body: longWordBody,
+      }),
+      env,
+      ctx,
+    );
+    expect(wordRes.status).toBe(200);
+    const wordJson = (await wordRes.json()) as {
+      type: number;
+      data: {
+        content: string;
+        flags: number;
+        allowed_mentions: { parse: string[] };
+      };
+    };
+    expect(wordJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
+    expect(wordJson.data.flags).toBe(INTERACTION_RESPONSE_FLAGS.EPHEMERAL);
+    expect(wordJson.data.content).toContain(`${String(MAX_WORD_TERM_LENGTH)} 文字以内`);
+    expect(wordJson.data.allowed_mentions).toEqual({ parse: [] });
+
+    await waitForAll();
+    expect(retrieveMock).not.toHaveBeenCalled();
+    expect(generateMock).not.toHaveBeenCalled();
   });
 });

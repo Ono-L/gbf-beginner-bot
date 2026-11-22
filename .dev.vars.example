@@ -16,3 +16,7 @@ DISCORD_APPLICATION_ID=your_discord_application_id_here
 
 # 任意: 開発用サーバーに即時反映したい場合のみ指定（未指定ならグローバル登録）
 # DISCORD_GUILD_ID=your_dev_guild_id_here
+
+# 任意（本番推奨）: Bot のコマンド実行を許可するサーバー ID（カンマ区切りで複数指定可）
+# 設定時は指定サーバー以外および DM からのコマンド実行を拒否します
+# ALLOWED_GUILD_IDS=your_guild_id_1,your_guild_id_2

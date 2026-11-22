@@ -17,6 +17,11 @@ export const INTERACTION_RESPONSE_TYPE = {
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE: 5,
 } as const;
 
+export const INTERACTION_RESPONSE_FLAGS = {
+  /** コマンドを実行した本人にのみ表示する一時メッセージ（Ephemeral） */
+  EPHEMERAL: 1 << 6,
+} as const;
+
 export const APPLICATION_COMMAND_OPTION_TYPE = {
   STRING: 3,
 } as const;
@@ -36,6 +41,7 @@ export interface DiscordApplicationCommandData {
 export interface DiscordInteraction {
   readonly id?: string;
   readonly application_id?: string;
+  readonly guild_id?: string;
   readonly type: number;
   readonly token?: string;
   readonly data?: DiscordApplicationCommandData;

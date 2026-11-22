@@ -66,6 +66,8 @@ npm run search:local -- "シェロ訓練の進め方を教えて"
    npx wrangler secret put DISCORD_PUBLIC_KEY
    npx wrangler secret put DISCORD_BOT_TOKEN
    npx wrangler secret put DISCORD_APPLICATION_ID
+   # 任意（本番推奨）: 許可する Discord サーバー ID をカンマ区切りで指定
+   npx wrangler secret put ALLOWED_GUILD_IDS
    ```
 4. **ナレッジ登録・デプロイ・スラッシュコマンド登録**
    ```bash
@@ -74,3 +76,4 @@ npm run search:local -- "シェロ訓練の進め方を教えて"
    npm run register-commands
    ```
 5. Discord Developer Portal の **Interactions Endpoint URL** に `https://<your-worker>.workers.dev/interactions` を設定すれば完了です。
+   - 外部サーバーからの意図しない招待を防ぐため、Discord Developer Portal で **Public Bot を OFF** にしておくことを推奨します。

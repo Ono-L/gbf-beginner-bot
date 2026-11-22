@@ -6,6 +6,12 @@
 
 import { APPLICATION_COMMAND_OPTION_TYPE } from "./types.js";
 
+/** `/ask` の質問文の最大文字数（API 課金・長文スパム対策） */
+export const MAX_ASK_QUESTION_LENGTH = 300;
+
+/** `/word` の検索用語の最大文字数 */
+export const MAX_WORD_TERM_LENGTH = 100;
+
 export interface DiscordCommandChoice {
   readonly name: string;
   readonly value: string;
@@ -16,6 +22,7 @@ export interface DiscordCommandOptionDefinition {
   readonly description: string;
   readonly type: number;
   readonly required: boolean;
+  readonly max_length?: number;
   readonly choices?: readonly DiscordCommandChoice[];
 }
 
@@ -43,9 +50,10 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
     options: [
       {
         name: "question",
-        description: "知りたいこと（例: ダマスカス鋼は使っていい？、マグナ編成とは？）",
+        description: "知りたいこと（300文字以内。例: ダマスカス鋼は使っていい？、マグナ編成とは？）",
         type: APPLICATION_COMMAND_OPTION_TYPE.STRING,
         required: true,
+        max_length: MAX_ASK_QUESTION_LENGTH,
       },
     ],
   },
@@ -68,9 +76,10 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
     options: [
       {
         name: "term",
-        description: "調べたい用語（例: マグナ、神石、片面、古戦場、ヒヒ掘り）",
+        description: "調べたい用語（100文字以内。例: マグナ、神石、片面、古戦場、ヒヒ掘り）",
         type: APPLICATION_COMMAND_OPTION_TYPE.STRING,
         required: true,
+        max_length: MAX_WORD_TERM_LENGTH,
       },
     ],
   },

@@ -20,4 +20,10 @@ export interface AppEnv {
   readonly DISCORD_BOT_TOKEN?: string;
   /** Discord Application ID */
   readonly DISCORD_APPLICATION_ID?: string;
+  /**
+   * コマンド実行を許可する Discord サーバー ID（カンマ区切り）。
+   * 設定時はここに含まれるサーバー以外（および DM）からのスラッシュコマンドを拒否します。
+   * 未設定または空文字の場合はサーバー制限を行いません。
+   */
+  readonly ALLOWED_GUILD_IDS?: string;
 }

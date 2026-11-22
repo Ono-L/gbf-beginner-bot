@@ -9,23 +9,25 @@
  *        │  Headers: X-Signature-Ed25519, X-Signature-Timestamp
  *        │  Body: Interaction JSON（生テキストで受け取る必要あり）
  *        ▼
- *   1. Ed25519 署名検証（`verifyDiscordSignature`）
- *        ├─ 不正・ヘッダ欠落 → 即座に HTTP 401 Unauthorized を返す
+ *   1. Ed25519 署名検証＋タイムスタンプ鮮度検証（`verifyDiscordSignature`）
+ *        ├─ 不正・ヘッダ欠落・古いタイムスタンプ → 即座に HTTP 401 Unauthorized を返す
  *        └─ 正常 → JSON をパースして type で分岐
  *        │
  *        ├── type: 1 (PING)
  *        │     └─► 即座に `{ type: 1 }` (PONG) を返す（Discord の生存確認）
  *        │
  *        └── type: 2 (APPLICATION_COMMAND)
+ *              ├─ 許可サーバー検証（`ALLOWED_GUILD_IDS` 設定時は許可外サーバー／DM を拒否）
  *              ├─ /guide [topic] ─► ナレッジから即時検索 → `{ type: 4, data: { content } }`
- *              ├─ /word <term>   ─► 用語集から即時検索   → `{ type: 4, data: { content } }`
+ *              ├─ /word <term>   ─► 文字数チェック → 用語集から即時検索 → `{ type: 4 }`
  *              └─ /ask <question>
+ *                    ├─► 空文字／文字数上限超過なら即座にエラー返答（API は呼ばない）
  *                    ├─► 即座に `{ type: 5 }` (Deferred Response: 「考え中…」表示) を返す
  *                    └─► `c.executionCtx.waitUntil(...)` で非同期に RAG を実行:
  *                          (a) 質問を RETRIEVAL_QUERY でベクトル化
  *                          (b) Vectorize + D1 から上位 3〜5 チャンクを取得
  *                          (c) Gemini で回答生成＋出典見出しを付与
- *                          (d) Discord Webhook PATCH で `@original` メッセージを更新
+ *                          (d) Discord Webhook PATCH（`allowed_mentions: { parse: [] }`）で元メッセージ更新
  *
  * ■ なぜ `/ask` だけ Deferred Response (`type: 5`) を使うのか？
  *   Discord は「3 秒以内に最初の HTTP レスポンスを返すこと」を必須としています。
@@ -39,6 +41,11 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/env.js";
 import {
+  MAX_ASK_QUESTION_LENGTH,
+  MAX_WORD_TERM_LENGTH,
+} from "../discord/commands.js";
+import {
+  INTERACTION_RESPONSE_FLAGS,
   INTERACTION_RESPONSE_TYPE,
   INTERACTION_TYPE,
   getStringOption,
@@ -63,6 +70,11 @@ import {
 
 const DISCORD_API_BASE = "https://discord.com/api/v10";
 
+/** `@everyone` / `@here` やユーザーメンションの誤爆を完全に防ぐ設定 */
+const NO_MENTIONS = {
+  parse: [] as readonly string[],
+} as const;
+
 export interface InteractionsDependencies {
   /** テスト時に Retriever を差し替えるためのファクトリ（未指定なら Cloudflare 本番構成を使用） */
   readonly createRetriever?: (env: AppEnv) => ChunkRetriever | null;
@@ -70,6 +82,25 @@ export interface InteractionsDependencies {
   readonly createGenerator?: (env: AppEnv) => TextGenerator | null;
   /** Discord Webhook PATCH 用の fetch 実装（テスト時にモック可能） */
   readonly fetchImpl?: typeof fetch;
+  /** 署名タイムスタンプ鮮度検証に使う現在時刻取得関数（テスト時に差し替え可能） */
+  readonly now?: () => number;
+}
+
+/**
+ * カンマ区切りの `ALLOWED_GUILD_IDS` 環境変数をパースして Set に変換する。
+ * 未設定・空文字の場合は null（サーバー制限無効）を返す。
+ */
+export function parseAllowedGuildIds(
+  raw: string | undefined,
+): ReadonlySet<string> | null {
+  if (raw === undefined) {
+    return null;
+  }
+  const ids = raw
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  return ids.length > 0 ? new Set(ids) : null;
 }
 
 /**
@@ -89,7 +120,10 @@ async function editOriginalInteractionResponse(params: {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      content,
+      allowed_mentions: NO_MENTIONS,
+    }),
   });
 
   if (!response.ok) {
@@ -250,6 +284,7 @@ export function createInteractionsRoute(
       signatureHex,
       timestamp,
       rawBody,
+      nowMs: deps.now ? deps.now() : Date.now(),
     });
 
     if (!isValid) {
@@ -274,6 +309,22 @@ export function createInteractionsRoute(
 
     // 2. スラッシュコマンド（APPLICATION_COMMAND）
     if (parsed.type === INTERACTION_TYPE.APPLICATION_COMMAND) {
+      // 許可サーバー制限（ALLOWED_GUILD_IDS が設定されている場合のみ適用）
+      const allowedGuildIds = parseAllowedGuildIds(c.env.ALLOWED_GUILD_IDS);
+      if (
+        allowedGuildIds !== null &&
+        (parsed.guild_id === undefined || !allowedGuildIds.has(parsed.guild_id))
+      ) {
+        return c.json({
+          type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
+          data: {
+            content: "この Bot は許可されたサーバー内でのみ利用できます。",
+            flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+            allowed_mentions: NO_MENTIONS,
+          },
+        });
+      }
+
       const commandName = parsed.data?.name;
 
       if (commandName === "ask") {
@@ -284,6 +335,19 @@ export function createInteractionsRoute(
             data: {
               content:
                 "質問内容を入力してください（例: `/ask question:ダマスカス鋼は使っていい？`）。",
+              flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+              allowed_mentions: NO_MENTIONS,
+            },
+          });
+        }
+
+        if (question.length > MAX_ASK_QUESTION_LENGTH) {
+          return c.json({
+            type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `質問は ${String(MAX_ASK_QUESTION_LENGTH)} 文字以内で入力してください（現在 ${String(question.length)} 文字）。`,
+              flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+              allowed_mentions: NO_MENTIONS,
             },
           });
         }
@@ -309,16 +373,28 @@ export function createInteractionsRoute(
           type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
             content: buildGuideReply(topic),
+            allowed_mentions: NO_MENTIONS,
           },
         });
       }
 
       if (commandName === "word") {
-        const term = getStringOption(parsed, "term") ?? "";
+        const term = (getStringOption(parsed, "term") ?? "").trim();
+        if (term.length > MAX_WORD_TERM_LENGTH) {
+          return c.json({
+            type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `用語は ${String(MAX_WORD_TERM_LENGTH)} 文字以内で入力してください（現在 ${String(term.length)} 文字）。`,
+              flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+              allowed_mentions: NO_MENTIONS,
+            },
+          });
+        }
         return c.json({
           type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
             content: buildWordReply(term),
+            allowed_mentions: NO_MENTIONS,
           },
         });
       }
@@ -327,6 +403,8 @@ export function createInteractionsRoute(
         type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
           content: `未対応のコマンドです: \`/${commandName ?? "unknown"}\``,
+          flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+          allowed_mentions: NO_MENTIONS,
         },
       });
     }
