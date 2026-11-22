@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gbf-beginner-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    }
+  },
+  "vars": {
+    // 回答生成に使用する Gemini モデル名（機密ではないため vars に定義）
+    "GEMINI_MODEL": "gemini-2.5-flash"
+  },
+  // 本文チャンクを保存する Cloudflare D1 データベース
+  // 作成手順: `npx wrangler d1 create gbf-beginner-bot-db` の出力で database_id を更新
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gbf-beginner-bot-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // 768次元（コサイン類似度）ベクトル検索用の Cloudflare Vectorize インデックス
+  // 作成手順: `npx wrangler vectorize create gbf-beginner-bot-index --dimensions=768 --metric=cosine`
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "gbf-beginner-bot-index"
+    }
+  ]
+}

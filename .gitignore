@@ -1,0 +1,22 @@
+# 依存関係・ビルド出力
+node_modules/
+dist/
+coverage/
+
+# Cloudflare Wrangler / ローカル状態
+.wrangler/
+
+# シークレット・環境変数（絶対にコミットしない）
+.dev.vars
+.env
+.env.*
+!.dev.vars.example
+
+# ローカル生成インデックス・一時出力
+data/local-index.json
+data/vectorize-upload.ndjson
+data/d1-seed.sql
+
+# OS / エディタ
+.DS_Store
+*.log

@@ -1,0 +1,31 @@
+{
+  "name": "gbf-beginner-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "グラブル初心者向け RAG 搭載 Discord Bot（Cloudflare Workers + Hono + Gemini API）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ingest:local": "tsx scripts/ingest.ts --mode local",
+    "ingest:local:mock": "tsx scripts/ingest.ts --mode local --mock-embed",
+    "ingest:cloudflare": "tsx scripts/ingest.ts --mode cloudflare",
+    "search:local": "tsx scripts/local-search.ts",
+    "register-commands": "tsx scripts/register-commands.ts"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261119.1",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.7",
+    "wrangler": "^4.0.0"
+  }
+}
