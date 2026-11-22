@@ -44,6 +44,9 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "古戦場の全体スケジュールと流れ", value: "gw_flow" },
   { name: "古戦場前の団長・副団長の準備", value: "dancho_prep" },
   { name: "本戦の団アビ管理と撤退判断", value: "dancho_battle" },
+  { name: "編成（構成）の基本的な組み方", value: "grid_build" },
+  { name: "ダメージ計算の基本（乗算と減衰）", value: "damage_calc" },
+  { name: "予測ダメージの見方（主人公のみ基準）", value: "pred_damage" },
 ];
 
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [

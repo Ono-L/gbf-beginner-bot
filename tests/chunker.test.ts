@@ -58,6 +58,7 @@ describe("chunkMarkdown", () => {
       "02_items_and_gacha.md",
       "03_glossary.md",
       "04_guild_war_and_dancho.md",
+      "05_grid_and_damage.md",
     ] as const;
 
     for (const file of files) {
