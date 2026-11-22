@@ -41,6 +41,9 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "金剛晶の温存", value: "kongo" },
   { name: "ガチャと天井（300連）", value: "gacha" },
   { name: "フェス待ち（レジェフェス・グラフェス）", value: "fes" },
+  { name: "古戦場の全体スケジュールと流れ", value: "gw_flow" },
+  { name: "古戦場前の団長・副団長の準備", value: "dancho_prep" },
+  { name: "本戦の団アビ管理と撤退判断", value: "dancho_battle" },
 ];
 
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
