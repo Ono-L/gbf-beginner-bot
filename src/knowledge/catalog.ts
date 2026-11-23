@@ -101,6 +101,31 @@ const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
     label: "十賢者の加入手順とおすすめ",
     keywords: ["十賢者", "アーカルム", "セフィラ玉髄", "砂箱"],
   },
+  {
+    key: "events",
+    label: "各種イベントの進め方（ストイベ・四象・ドレバラ）",
+    keywords: ["ストーリーイベント", "ストイベ", "四象降臨", "ドレバラ"],
+  },
+  {
+    key: "jobs",
+    label: "おすすめジョブ取得ロードマップ",
+    keywords: ["最優先に取るべきおすすめジョブ", "Class V", "ジョブ", "レリックバスター"],
+  },
+  {
+    key: "weapons",
+    label: "重要武器シリーズ（マグナ3・終末・オメガ）",
+    keywords: ["マグナ1からマグナ2", "終末の神器", "オメガウェポン", "マグナ3"],
+  },
+  {
+    key: "rank_guide",
+    label: "ランク帯別の目標とやることリスト",
+    keywords: ["Rank 1〜100", "Rank 101〜150", "ランク帯", "やること"],
+  },
+  {
+    key: "tips",
+    label: "快適設定・倉庫整理・団活の基本",
+    keywords: ["快適設定", "フルオート", "倉庫整理", "団活"],
+  },
 ];
 
 let cachedAllChunks: readonly KnowledgeChunk[] | null = null;
@@ -140,15 +165,7 @@ function formatChunkResponse(chunk: KnowledgeChunk): string {
 export function buildGuideReply(topic?: string): string {
   const chunks = getBuiltinKnowledgeChunks();
   const guideChunks = chunks.filter(
-    (chunk) =>
-      chunk.sourceFile === "01_beginner_roadmap.md" ||
-      chunk.sourceFile === "02_items_and_gacha.md" ||
-      chunk.sourceFile === "04_guild_war_and_dancho.md" ||
-      chunk.sourceFile === "05_grid_and_damage.md" ||
-      chunk.sourceFile === "06_high_difficulty_intro.md" ||
-      chunk.sourceFile === "07_revans_raids.md" ||
-      chunk.sourceFile === "08_endgame_raids.md" ||
-      chunk.sourceFile === "09_eternals_and_evokers.md",
+    (chunk) => chunk.sourceFile !== "03_glossary.md",
   );
 
   if (topic === undefined || topic.trim().length === 0) {
