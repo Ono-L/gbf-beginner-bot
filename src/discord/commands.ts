@@ -47,6 +47,7 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "編成（構成）の基本的な組み方", value: "grid_build" },
   { name: "ダメージ計算の基本（乗算と減衰）", value: "damage_calc" },
   { name: "予測ダメージの見方（主人公のみ基準）", value: "pred_damage" },
+  { name: "高難度マルチ共通の基本（V2・予兆）", value: "v2_basics" },
 ];
 
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [

@@ -86,6 +86,11 @@ const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
     label: "予測ダメージの見方と注意点（主人公のみ基準）",
     keywords: ["予測ダメージ", "ダメージ予想", "主人公のみ", "トライアルバトル"],
   },
+  {
+    key: "v2_basics",
+    label: "高難度マルチ共通の基本（V2・予兆・ガード）",
+    keywords: ["高難度マルチ共通", "予兆", "ガード進行", "V2"],
+  },
 ];
 
 let cachedAllChunks: readonly KnowledgeChunk[] | null = null;
@@ -127,7 +132,10 @@ export function buildGuideReply(topic?: string): string {
       chunk.sourceFile === "01_beginner_roadmap.md" ||
       chunk.sourceFile === "02_items_and_gacha.md" ||
       chunk.sourceFile === "04_guild_war_and_dancho.md" ||
-      chunk.sourceFile === "05_grid_and_damage.md",
+      chunk.sourceFile === "05_grid_and_damage.md" ||
+      chunk.sourceFile === "06_high_difficulty_intro.md" ||
+      chunk.sourceFile === "07_revans_raids.md" ||
+      chunk.sourceFile === "08_endgame_raids.md",
   );
 
   if (topic === undefined || topic.trim().length === 0) {
