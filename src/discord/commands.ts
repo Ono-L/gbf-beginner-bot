@@ -55,11 +55,11 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
   {
     name: "ask",
-    description: "グラブル初心者向けの質問を RAG ナレッジをもとに回答します",
+    description: "グラブルの疑問をビィナビがナレッジをもとに答えるぜ！",
     options: [
       {
         name: "question",
-        description: "知りたいこと（300文字以内。例: ダマスカス鋼は使っていい？、マグナ編成とは？）",
+        description: "知りたいこと（300文字以内。例: ダマスカス鋼は使っていい？、シエテHLの注意点は？）",
         type: APPLICATION_COMMAND_OPTION_TYPE.STRING,
         required: true,
         max_length: MAX_ASK_QUESTION_LENGTH,
@@ -68,11 +68,11 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
   },
   {
     name: "guide",
-    description: "初心者ロードマップや貴重アイテム管理のガイドを即時表示します",
+    description: "初心者ロードマップや古戦場・編成・高難度ガイドをすぐ見せるぜ！",
     options: [
       {
         name: "topic",
-        description: "表示したいトピック（省略するとトピック一覧を表示します）",
+        description: "見たいトピック（省略するとトピック一覧を出すぞ！）",
         type: APPLICATION_COMMAND_OPTION_TYPE.STRING,
         required: false,
         choices: GUIDE_TOPIC_CHOICES,
@@ -81,11 +81,11 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
   },
   {
     name: "word",
-    description: "グラブルの初心者向け用語をナレッジから即時検索します",
+    description: "グラブルの用語や高難度クエストをメモからすぐ調べるぜ！",
     options: [
       {
         name: "term",
-        description: "調べたい用語（100文字以内。例: マグナ、神石、片面、古戦場、ヒヒ掘り）",
+        description: "調べたい用語やクエスト名（100文字以内。例: マグナ、古戦場、シエテHL）",
         type: APPLICATION_COMMAND_OPTION_TYPE.STRING,
         required: true,
         max_length: MAX_WORD_TERM_LENGTH,

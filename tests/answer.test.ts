@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   NO_EVIDENCE_REPLY,
+  buildSystemInstruction,
   generateRagAnswer,
   type TextGenerator,
 } from "../src/rag/answer.js";
@@ -88,5 +89,13 @@ describe("generateRagAnswer", () => {
 
     expect(result.hasEvidence).toBe(false);
     expect(result.answer).toBe(NO_EVIDENCE_REPLY);
+  });
+
+  it("システムプロンプトと根拠不足メッセージにビィナビ口調が反映されている", () => {
+    const instruction = buildSystemInstruction();
+    expect(instruction).toContain("ビィナビ");
+    expect(instruction).toContain("オイラ");
+    expect(NO_EVIDENCE_REPLY).toContain("オイラ");
+    expect(NO_EVIDENCE_REPLY).toContain("ゲーム内のお知らせ");
   });
 });
