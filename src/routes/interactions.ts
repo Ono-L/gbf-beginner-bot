@@ -216,7 +216,7 @@ async function processAskInBackground(params: {
         applicationId,
         interactionToken,
         content:
-          "RAG 検索の環境設定（GEMINI_API_KEY / Vectorize / D1）が未完了のため回答できませんでした。管理者にお問い合わせください。",
+          "すまねえ、オイラの準備（GEMINI_API_KEY / Vectorize / D1 の設定）がまだ終わってないみたいだぜ！管理人に確認してくれよな。",
         fetchImpl,
       });
       return;
@@ -251,7 +251,7 @@ async function processAskInBackground(params: {
       applicationId,
       interactionToken,
       content:
-        "回答の生成中にエラーが発生しました。少し時間をおいてからもう一度お試しください。",
+        "うわっ、回答を作ってる途中でエラーが出ちまったぜ！ちょっと時間をおいてからもう一回聞いてくれよな。",
       fetchImpl,
     });
   }
@@ -318,7 +318,8 @@ export function createInteractionsRoute(
         return c.json({
           type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
           data: {
-            content: "この Bot は許可されたサーバー内でのみ利用できます。",
+            content:
+              "すまねえ、ビィナビは許可されたサーバーの中でしか使えねえんだぜ！",
             flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
             allowed_mentions: NO_MENTIONS,
           },
@@ -334,7 +335,7 @@ export function createInteractionsRoute(
             type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
               content:
-                "質問内容を入力してください（例: `/ask question:ダマスカス鋼は使っていい？`）。",
+                "聞きたいことを入れてくれよな！（例: `/ask question:ダマスカス鋼は使っていい？`）",
               flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
               allowed_mentions: NO_MENTIONS,
             },
@@ -345,7 +346,7 @@ export function createInteractionsRoute(
           return c.json({
             type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `質問は ${String(MAX_ASK_QUESTION_LENGTH)} 文字以内で入力してください（現在 ${String(question.length)} 文字）。`,
+              content: `質問が長すぎるぜ！${String(MAX_ASK_QUESTION_LENGTH)} 文字以内で聞いてくれよな（現在 ${String(question.length)} 文字）。`,
               flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
               allowed_mentions: NO_MENTIONS,
             },
@@ -384,7 +385,7 @@ export function createInteractionsRoute(
           return c.json({
             type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
-              content: `用語は ${String(MAX_WORD_TERM_LENGTH)} 文字以内で入力してください（現在 ${String(term.length)} 文字）。`,
+              content: `用語が長すぎるぜ！${String(MAX_WORD_TERM_LENGTH)} 文字以内で入れてくれよな（現在 ${String(term.length)} 文字）。`,
               flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
               allowed_mentions: NO_MENTIONS,
             },
@@ -402,7 +403,7 @@ export function createInteractionsRoute(
       return c.json({
         type: INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
         data: {
-          content: `未対応のコマンドです: \`/${commandName ?? "unknown"}\``,
+          content: `おっと、そのコマンド（\`/${commandName ?? "unknown"}\`）はオイラ知らないぜ！`,
           flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
           allowed_mentions: NO_MENTIONS,
         },

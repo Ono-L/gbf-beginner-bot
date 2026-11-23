@@ -123,6 +123,8 @@ function normalizeQuery(text: string): string {
 
 function formatChunkResponse(chunk: KnowledgeChunk): string {
   return [
+    "よし、オイラのメモから持ってきたぜ！",
+    "",
     `**${chunk.heading}**`,
     "",
     chunk.content,
@@ -154,12 +156,12 @@ export function buildGuideReply(topic?: string): string {
       (item) => `- \`${item.key}\` : ${item.label}`,
     );
     return [
-      "📘 **グラブル初心者ガイド一覧**",
-      "気になるトピックを指定して `/guide topic:<名前>` を実行してください。",
+      "📘 **ビィナビのグラブルガイド一覧だぜ！**",
+      "気になるトピックを選んで `/guide topic:<名前>` を打ってくれよな！",
       "",
       ...listLines,
       "",
-      "自由に質問したい場合は `/ask question:<質問内容>` も使えます！",
+      "自由に質問したいときは `/ask question:<質問内容>` でオイラに聞いてくれ！",
     ].join("\n");
   }
 
@@ -194,10 +196,10 @@ export function buildGuideReply(topic?: string): string {
   }
 
   return [
-    `指定されたトピック「${topic.trim()}」は手元のガイドに見つかりませんでした。`,
+    `おっと、「${topic.trim()}」はオイラのガイドに見つからなかったぜ！`,
     NO_EVIDENCE_REPLY,
     "",
-    "ヒント: `/guide` を引数なしで実行すると、閲覧可能なトピック一覧を確認できます。",
+    "ヒント: `/guide` を引数なしで打つと、見られるトピック一覧を出せるぞ！",
   ].join("\n");
 }
 
@@ -208,7 +210,7 @@ export function buildGuideReply(topic?: string): string {
 export function buildWordReply(term: string): string {
   const trimmed = term.trim();
   if (trimmed.length === 0) {
-    return "調べたい用語を入力してください（例: `/word term:マグナ`、`/word term:古戦場`）。";
+    return "調べたい用語を入れてくれよな！（例: `/word term:マグナ`、`/word term:古戦場`）";
   }
 
   const normalized = normalizeQuery(trimmed);
@@ -233,10 +235,10 @@ export function buildWordReply(term: string): string {
 
   const availableTerms = glossaryChunks.map((c) => `・${c.heading}`).join("\n");
   return [
-    `用語「${trimmed}」は手元のナレッジベースに見つかりませんでした。`,
+    `おっと、用語「${trimmed}」はオイラのメモに見つからなかったぜ！`,
     NO_EVIDENCE_REPLY,
     "",
-    "📖 **現在収録している主な用語見出し**",
+    "📖 **今オイラが覚えてる主な用語見出し**",
     availableTerms,
   ].join("\n");
 }
