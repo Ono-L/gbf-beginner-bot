@@ -48,6 +48,7 @@ import {
   INTERACTION_RESPONSE_FLAGS,
   INTERACTION_RESPONSE_TYPE,
   INTERACTION_TYPE,
+  getBooleanOption,
   getStringOption,
   isDiscordInteraction,
   type DiscordInteraction,
@@ -327,6 +328,8 @@ export function createInteractionsRoute(
       }
 
       const commandName = parsed.data?.name;
+      // デフォルトは実行した本人にのみ表示（Ephemeral）。`public: true` 指定時のみチャンネル公開
+      const isPublic = getBooleanOption(parsed, "public") === true;
 
       if (commandName === "ask") {
         const question = getStringOption(parsed, "question")?.trim() ?? "";
@@ -363,9 +366,18 @@ export function createInteractionsRoute(
           }),
         );
 
-        return c.json({
-          type: INTERACTION_RESPONSE_TYPE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-        });
+        return c.json(
+          isPublic
+            ? {
+                type: INTERACTION_RESPONSE_TYPE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+              }
+            : {
+                type: INTERACTION_RESPONSE_TYPE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+                data: {
+                  flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+                },
+              },
+        );
       }
 
       if (commandName === "guide") {
@@ -375,6 +387,7 @@ export function createInteractionsRoute(
           data: {
             content: buildGuideReply(topic),
             allowed_mentions: NO_MENTIONS,
+            ...(isPublic ? {} : { flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL }),
           },
         });
       }
@@ -396,6 +409,7 @@ export function createInteractionsRoute(
           data: {
             content: buildWordReply(term),
             allowed_mentions: NO_MENTIONS,
+            ...(isPublic ? {} : { flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL }),
           },
         });
       }

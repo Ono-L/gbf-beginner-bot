@@ -52,6 +52,13 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "十賢者の加入とおすすめ", value: "evokers" },
 ];
 
+const PUBLIC_OPTION: DiscordCommandOptionDefinition = {
+  name: "public",
+  description: "True にするとチャンネルのみんなにも見える形で表示するぜ（省略時は自分だけ表示）",
+  type: APPLICATION_COMMAND_OPTION_TYPE.BOOLEAN,
+  required: false,
+};
+
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
   {
     name: "ask",
@@ -64,6 +71,7 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
         required: true,
         max_length: MAX_ASK_QUESTION_LENGTH,
       },
+      PUBLIC_OPTION,
     ],
   },
   {
@@ -77,6 +85,7 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
         required: false,
         choices: GUIDE_TOPIC_CHOICES,
       },
+      PUBLIC_OPTION,
     ],
   },
   {
@@ -90,6 +99,7 @@ export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
         required: true,
         max_length: MAX_WORD_TERM_LENGTH,
       },
+      PUBLIC_OPTION,
     ],
   },
 ];

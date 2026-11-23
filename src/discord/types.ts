@@ -24,6 +24,7 @@ export const INTERACTION_RESPONSE_FLAGS = {
 
 export const APPLICATION_COMMAND_OPTION_TYPE = {
   STRING: 3,
+  BOOLEAN: 5,
 } as const;
 
 export interface DiscordCommandOption {
@@ -71,4 +72,19 @@ export function getStringOption(
   }
   const found = options.find((opt) => opt.name === optionName);
   return typeof found?.value === "string" ? found.value : undefined;
+}
+
+/**
+ * スラッシュコマンドの真偽値オプションを安全に取り出すヘルパー。
+ */
+export function getBooleanOption(
+  interaction: DiscordInteraction,
+  optionName: string,
+): boolean | undefined {
+  const options = interaction.data?.options;
+  if (!Array.isArray(options)) {
+    return undefined;
+  }
+  const found = options.find((opt) => opt.name === optionName);
+  return typeof found?.value === "boolean" ? found.value : undefined;
 }

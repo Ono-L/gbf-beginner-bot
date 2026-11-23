@@ -179,7 +179,7 @@ describe("POST /interactions", () => {
     expect(await res.json()).toEqual({ type: INTERACTION_RESPONSE_TYPE.PONG });
   });
 
-  it("/guide と /word はナレッジから即時応答 (type: 4, メンション無効) を返す", async () => {
+  it("/guide と /word はナレッジから即時応答 (type: 4, デフォルト非公開・メンション無効) を返す", async () => {
     const { publicKeyHex, sign } = await createTestKeyPair();
     const app = createApp({ now: () => FIXED_NOW_MS });
     const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
@@ -210,10 +210,11 @@ describe("POST /interactions", () => {
     expect(guideRes.status).toBe(200);
     const guideJson = (await guideRes.json()) as {
       type: number;
-      data: { content: string; allowed_mentions: { parse: string[] } };
+      data: { content: string; flags?: number; allowed_mentions: { parse: string[] } };
     };
     expect(guideJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
     expect(guideJson.data.content).toContain("シェロカルテの特別訓練");
+    expect(guideJson.data.flags).toBe(INTERACTION_RESPONSE_FLAGS.EPHEMERAL);
     expect(guideJson.data.allowed_mentions).toEqual({ parse: [] });
 
     // /word (term=古戦場)
@@ -241,14 +242,15 @@ describe("POST /interactions", () => {
     expect(wordRes.status).toBe(200);
     const wordJson = (await wordRes.json()) as {
       type: number;
-      data: { content: string; allowed_mentions: { parse: string[] } };
+      data: { content: string; flags?: number; allowed_mentions: { parse: string[] } };
     };
     expect(wordJson.type).toBe(INTERACTION_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE);
     expect(wordJson.data.content).toContain("決戦！星の古戦場");
+    expect(wordJson.data.flags).toBe(INTERACTION_RESPONSE_FLAGS.EPHEMERAL);
     expect(wordJson.data.allowed_mentions).toEqual({ parse: [] });
   });
 
-  it("/ask は即座に Deferred (type: 5) を返し、waitUntil で RAG 回答をメンション無効の Webhook PATCH で更新する", async () => {
+  it("/ask は即座にデフォルト非公開の Deferred (type: 5) を返し、waitUntil で RAG 回答をメンション無効の Webhook PATCH で更新する", async () => {
     const { publicKeyHex, sign } = await createTestKeyPair();
     const webhookFetch = vi.fn<typeof fetch>(async () => {
       return new Response(JSON.stringify({ id: "msg-1" }), { status: 200 });
@@ -313,6 +315,9 @@ describe("POST /interactions", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       type: INTERACTION_RESPONSE_TYPE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        flags: INTERACTION_RESPONSE_FLAGS.EPHEMERAL,
+      },
     });
 
     // waitUntil に登録された非同期処理の完了を待機
@@ -331,6 +336,116 @@ describe("POST /interactions", () => {
     expect(sentPayload.content).toContain("300連");
     expect(sentPayload.content).toContain("ガチャと天井（300連）の基本ルール");
     expect(sentPayload.allowed_mentions).toEqual({ parse: [] });
+  });
+
+  it("public: true を指定したときは /ask・/guide・/word いずれもチャンネル公開応答（flags なし）になる", async () => {
+    const { publicKeyHex, sign } = await createTestKeyPair();
+    const webhookFetch = vi.fn<typeof fetch>(async () => {
+      return new Response(JSON.stringify({ id: "msg-pub" }), { status: 200 });
+    });
+    const app = createApp({
+      now: () => FIXED_NOW_MS,
+      createRetriever: () => ({ retrieve: vi.fn(async () => []) }),
+      createGenerator: () => ({ generate: vi.fn(async () => "dummy") }),
+      fetchImpl: webhookFetch,
+    });
+    const env: AppEnv = { DISCORD_PUBLIC_KEY: publicKeyHex };
+    const { ctx, waitForAll } = createMockExecutionContext();
+
+    // /guide (public=true)
+    const guideBody = JSON.stringify({
+      type: INTERACTION_TYPE.APPLICATION_COMMAND,
+      data: {
+        name: "guide",
+        options: [
+          { name: "topic", type: 3, value: "shero" },
+          { name: "public", type: 5, value: true },
+        ],
+      },
+    });
+    const guideTs = String(FIXED_NOW_SEC + 10);
+    const guideRes = await app.fetch(
+      new Request("http://localhost/interactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature-Ed25519": await sign(guideTs, guideBody),
+          "X-Signature-Timestamp": guideTs,
+        },
+        body: guideBody,
+      }),
+      env,
+      ctx,
+    );
+    const guideJson = (await guideRes.json()) as {
+      type: number;
+      data: { content: string; flags?: number };
+    };
+    expect(guideJson.data.flags).toBeUndefined();
+
+    // /word (public=true)
+    const wordBody = JSON.stringify({
+      type: INTERACTION_TYPE.APPLICATION_COMMAND,
+      data: {
+        name: "word",
+        options: [
+          { name: "term", type: 3, value: "古戦場" },
+          { name: "public", type: 5, value: true },
+        ],
+      },
+    });
+    const wordTs = String(FIXED_NOW_SEC + 11);
+    const wordRes = await app.fetch(
+      new Request("http://localhost/interactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature-Ed25519": await sign(wordTs, wordBody),
+          "X-Signature-Timestamp": wordTs,
+        },
+        body: wordBody,
+      }),
+      env,
+      ctx,
+    );
+    const wordJson = (await wordRes.json()) as {
+      type: number;
+      data: { content: string; flags?: number };
+    };
+    expect(wordJson.data.flags).toBeUndefined();
+
+    // /ask (public=true)
+    const askBody = JSON.stringify({
+      type: INTERACTION_TYPE.APPLICATION_COMMAND,
+      application_id: "app-12345",
+      token: "tok-pub",
+      data: {
+        name: "ask",
+        options: [
+          { name: "question", type: 3, value: "天井は何連？" },
+          { name: "public", type: 5, value: true },
+        ],
+      },
+    });
+    const askTs = String(FIXED_NOW_SEC + 12);
+    const askRes = await app.fetch(
+      new Request("http://localhost/interactions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Signature-Ed25519": await sign(askTs, askBody),
+          "X-Signature-Timestamp": askTs,
+        },
+        body: askBody,
+      }),
+      env,
+      ctx,
+    );
+    expect(await askRes.json()).toEqual({
+      type: INTERACTION_RESPONSE_TYPE.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+    });
+
+    await waitForAll();
   });
 
   it("ALLOWED_GUILD_IDS が設定されている場合、未許可サーバーや DM からの実行は RAG を呼ばずに拒否する", async () => {
