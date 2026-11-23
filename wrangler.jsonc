@@ -17,7 +17,7 @@
   },
   "vars": {
     // 回答生成に使用する Gemini モデル名（機密ではないため vars に定義）
-    "GEMINI_MODEL": "gemini-2.5-flash"
+    "GEMINI_MODEL": "gemini-flash-lite-latest"
   },
   // 本文チャンクを保存する Cloudflare D1 データベース
   // 作成手順: `npx wrangler d1 create gbf-beginner-bot-db` の出力で database_id を更新

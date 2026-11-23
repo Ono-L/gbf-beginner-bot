@@ -29,7 +29,19 @@
 
 import type { RetrievedChunk } from "./retriever.js";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-flash-lite-latest";
+
+/** メインモデルが 404 / 429 / 5xx やタイムアウト時に自動切替するフォールバック候補 */
+export const DEFAULT_GEMINI_FALLBACK_MODELS: readonly string[] = [
+  "gemini-3.5-flash-lite",
+  "gemini-3.1-flash-lite",
+];
+
+/** 1 モデルあたりの API タイムアウト（ミリ秒） */
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+
+/** 自動フォールバック対象とする HTTP ステータスコード */
+const RETRYABLE_HTTP_STATUSES = new Set([404, 429, 500, 502, 503, 504]);
 
 export const NO_EVIDENCE_REPLY =
   "すまねえ、オイラの手元のナレッジにはその情報が載ってねえんだぜ！推測で適当なことは言えねえから、ゲーム内のお知らせや最新の攻略情報を確認してくれよな！";
@@ -49,6 +61,10 @@ export interface TextGenerator {
 export interface GeminiTextGeneratorOptions {
   readonly apiKey: string;
   readonly model?: string;
+  /** メインモデル失敗時に順番に試すフォールバックモデル一覧 */
+  readonly fallbackModels?: readonly string[];
+  /** 1 リクエストあたりのタイムアウト（ミリ秒） */
+  readonly timeoutMs?: number;
   readonly fetchImpl?: typeof fetch;
   readonly baseUrl?: string;
 }
@@ -72,6 +88,7 @@ interface GeminiGenerateResponse {
     readonly content?: {
       readonly parts?: ReadonlyArray<{
         readonly text?: unknown;
+        readonly thought?: unknown;
       }>;
     };
   }>;
@@ -83,7 +100,28 @@ interface GeminiGenerateResponse {
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 /**
+ * メインモデルとフォールバックモデルから重複なしの試行順リストを組み立てる。
+ */
+function buildModelCandidates(
+  primaryModel: string,
+  fallbackModels: readonly string[],
+): string[] {
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+  for (const raw of [primaryModel, ...fallbackModels]) {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0 && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      candidates.push(trimmed);
+    }
+  }
+  return candidates;
+}
+
+/**
  * Gemini API (`generateContent`) を呼び出す TextGenerator を生成する。
+ * モデル廃止（404）や一時的な混雑（429 / 503）・タイムアウト時は
+ * フォールバックモデルへ自動的に切り替えて回答生成を継続する。
  */
 export function createGeminiTextGenerator(
   options: GeminiTextGeneratorOptions,
@@ -93,55 +131,95 @@ export function createGeminiTextGenerator(
     throw new Error("GEMINI_API_KEY が設定されていません。");
   }
 
-  const model = (options.model ?? DEFAULT_GEMINI_MODEL).trim() || DEFAULT_GEMINI_MODEL;
+  const primaryModel =
+    (options.model ?? DEFAULT_GEMINI_MODEL).trim() || DEFAULT_GEMINI_MODEL;
+  const fallbackModels =
+    options.fallbackModels ?? DEFAULT_GEMINI_FALLBACK_MODELS;
+  const candidates = buildModelCandidates(primaryModel, fallbackModels);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = (options.baseUrl ?? DEFAULT_GEMINI_BASE_URL).replace(/\/+$/, "");
 
   return {
     async generate(input: GenerationInput): Promise<string> {
-      const url = `${baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
-
-      const response = await fetchImpl(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
+      const requestBody = JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: input.systemInstruction }],
         },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: input.systemInstruction }],
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: input.userPrompt }],
           },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: input.userPrompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 700,
-          },
-        }),
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+        },
       });
 
-      const payload = (await response.json()) as GeminiGenerateResponse;
+      let lastError: Error | null = null;
 
-      if (!response.ok) {
-        const detail = payload.error?.message ?? `HTTP ${String(response.status)}`;
-        throw new Error(`Gemini Generate API エラー: ${detail}`);
+      for (let i = 0; i < candidates.length; i += 1) {
+        const model = candidates[i] ?? primaryModel;
+        const hasNextCandidate = i < candidates.length - 1;
+        const url = `${baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
+
+        let response: Response;
+        try {
+          response = await fetchImpl(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": apiKey,
+            },
+            body: requestBody,
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+        } catch (error) {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          lastError = new Error(`Gemini Generate API 通信エラー (${model}): ${errMsg}`);
+          if (hasNextCandidate) {
+            continue;
+          }
+          throw lastError;
+        }
+
+        let payload: GeminiGenerateResponse = {};
+        try {
+          payload = (await response.json()) as GeminiGenerateResponse;
+        } catch {
+          // 非 JSON レスポンス時はステータスコードのみで判定
+        }
+
+        if (!response.ok) {
+          const detail = payload.error?.message ?? `HTTP ${String(response.status)}`;
+          lastError = new Error(`Gemini Generate API エラー (${model}): ${detail}`);
+          if (hasNextCandidate && RETRYABLE_HTTP_STATUSES.has(response.status)) {
+            continue;
+          }
+          throw lastError;
+        }
+
+        const parts = payload.candidates?.[0]?.content?.parts ?? [];
+        const text = parts
+          .filter((part) => part.thought !== true)
+          .map((part) => (typeof part.text === "string" ? part.text : ""))
+          .join("")
+          .trim();
+
+        if (text.length === 0) {
+          lastError = new Error(`Gemini API から空の回答が返されました (${model})。`);
+          if (hasNextCandidate) {
+            continue;
+          }
+          throw lastError;
+        }
+
+        return text;
       }
 
-      const parts = payload.candidates?.[0]?.content?.parts ?? [];
-      const text = parts
-        .map((part) => (typeof part.text === "string" ? part.text : ""))
-        .join("")
-        .trim();
-
-      if (text.length === 0) {
-        throw new Error("Gemini API から空の回答が返されました。");
-      }
-
-      return text;
+      throw lastError ?? new Error("Gemini Generate API の呼び出しに失敗しました。");
     },
   };
 }

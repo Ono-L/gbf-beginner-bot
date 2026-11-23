@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   NO_EVIDENCE_REPLY,
   buildSystemInstruction,
+  createGeminiTextGenerator,
   generateRagAnswer,
   type TextGenerator,
 } from "../src/rag/answer.js";
@@ -97,5 +98,62 @@ describe("generateRagAnswer", () => {
     expect(instruction).toContain("オイラ");
     expect(NO_EVIDENCE_REPLY).toContain("オイラ");
     expect(NO_EVIDENCE_REPLY).toContain("ゲーム内のお知らせ");
+  });
+});
+
+describe("createGeminiTextGenerator", () => {
+  it("メインモデルが 404 / 503 のときはフォールバックモデルへ自動切替し thought パートを除外する", async () => {
+    const calledUrls: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === "string" ? input : input.toString();
+      calledUrls.push(url);
+
+      if (url.includes("gemini-2.5-flash")) {
+        return new Response(
+          JSON.stringify({ error: { message: "Model not found" } }),
+          { status: 404 },
+        );
+      }
+      if (url.includes("gemini-3.8-flash")) {
+        return new Response(
+          JSON.stringify({ error: { message: "High demand" } }),
+          { status: 503 },
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { text: "内部思考メモ", thought: true },
+                  { text: "オイラがバッチリ答えるぜ！" },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    });
+
+    const generator = createGeminiTextGenerator({
+      apiKey: "dummy-key",
+      model: "gemini-2.5-flash",
+      fallbackModels: ["gemini-3.8-flash", "gemini-flash-lite-latest"],
+      fetchImpl: fetchMock,
+    });
+
+    const result = await generator.generate({
+      systemInstruction: "system",
+      userPrompt: "question",
+    });
+
+    expect(result).toBe("オイラがバッチリ答えるぜ！");
+    expect(calledUrls).toHaveLength(3);
+    expect(calledUrls[0]).toContain("gemini-2.5-flash");
+    expect(calledUrls[1]).toContain("gemini-3.8-flash");
+    expect(calledUrls[2]).toContain("gemini-flash-lite-latest");
   });
 });
