@@ -62,6 +62,7 @@ describe("chunkMarkdown", () => {
       "06_high_difficulty_intro.md",
       "07_revans_raids.md",
       "08_endgame_raids.md",
+      "09_eternals_and_evokers.md",
     ] as const;
 
     for (const file of files) {

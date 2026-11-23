@@ -48,6 +48,8 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "ダメージ計算の基本（乗算と減衰）", value: "damage_calc" },
   { name: "予測ダメージの見方（主人公のみ基準）", value: "pred_damage" },
   { name: "高難度マルチ共通の基本（V2・予兆）", value: "v2_basics" },
+  { name: "十天衆（10天）の加入とおすすめ", value: "eternals" },
+  { name: "十賢者の加入とおすすめ", value: "evokers" },
 ];
 
 export const DISCORD_COMMANDS: readonly DiscordCommandDefinition[] = [
