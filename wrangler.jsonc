@@ -25,7 +25,7 @@
     {
       "binding": "DB",
       "database_name": "gbf-beginner-bot-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "72ab2f01-93de-45bd-b790-71a34ac2f6ea",
       "migrations_dir": "migrations"
     }
   ],
