@@ -91,6 +91,16 @@ const GUIDE_TOPICS: readonly GuideTopicSpec[] = [
     label: "高難度マルチ共通の基本（V2・予兆・ガード）",
     keywords: ["高難度マルチ共通", "予兆", "ガード進行", "V2"],
   },
+  {
+    key: "eternals",
+    label: "十天衆（10天）の加入手順とおすすめ",
+    keywords: ["十天衆", "10天", "天星器", "限界超越"],
+  },
+  {
+    key: "evokers",
+    label: "十賢者の加入手順とおすすめ",
+    keywords: ["十賢者", "アーカルム", "セフィラ玉髄", "砂箱"],
+  },
 ];
 
 let cachedAllChunks: readonly KnowledgeChunk[] | null = null;
@@ -135,7 +145,8 @@ export function buildGuideReply(topic?: string): string {
       chunk.sourceFile === "05_grid_and_damage.md" ||
       chunk.sourceFile === "06_high_difficulty_intro.md" ||
       chunk.sourceFile === "07_revans_raids.md" ||
-      chunk.sourceFile === "08_endgame_raids.md",
+      chunk.sourceFile === "08_endgame_raids.md" ||
+      chunk.sourceFile === "09_eternals_and_evokers.md",
   );
 
   if (topic === undefined || topic.trim().length === 0) {
