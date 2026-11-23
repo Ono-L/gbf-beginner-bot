@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_KNOWLEDGE_DOCS } from "../src/knowledge/builtin.js";
@@ -53,17 +53,12 @@ describe("chunkMarkdown", () => {
 
   it("すべての実ナレッジファイル（knowledge/*.md）が 300〜450 文字程度で分割され、ID が 64 バイト以内に収まる", () => {
     const knowledgeDir = resolve(process.cwd(), "knowledge");
-    const files = [
-      "01_beginner_roadmap.md",
-      "02_items_and_gacha.md",
-      "03_glossary.md",
-      "04_guild_war_and_dancho.md",
-      "05_grid_and_damage.md",
-      "06_high_difficulty_intro.md",
-      "07_revans_raids.md",
-      "08_endgame_raids.md",
-      "09_eternals_and_evokers.md",
-    ] as const;
+    const files = readdirSync(knowledgeDir)
+      .filter((file) => file.endsWith(".md"))
+      .sort();
+
+    expect(files.length).toBeGreaterThanOrEqual(16);
+    expect(BUILTIN_KNOWLEDGE_DOCS).toHaveLength(files.length);
 
     for (const file of files) {
       const markdown = readFileSync(resolve(knowledgeDir, file), "utf8");

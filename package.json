@@ -14,6 +14,7 @@
     "ingest:local": "tsx scripts/ingest.ts --mode local",
     "ingest:local:mock": "tsx scripts/ingest.ts --mode local --mock-embed",
     "ingest:cloudflare": "tsx scripts/ingest.ts --mode cloudflare",
+    "sync-builtin": "tsx scripts/sync-builtin.ts",
     "search:local": "tsx scripts/local-search.ts",
     "register-commands": "tsx scripts/register-commands.ts"
   },

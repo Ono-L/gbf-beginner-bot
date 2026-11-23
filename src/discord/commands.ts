@@ -50,6 +50,11 @@ export const GUIDE_TOPIC_CHOICES: readonly DiscordCommandChoice[] = [
   { name: "高難度マルチ共通の基本（V2・予兆）", value: "v2_basics" },
   { name: "十天衆（10天）の加入とおすすめ", value: "eternals" },
   { name: "十賢者の加入とおすすめ", value: "evokers" },
+  { name: "各種イベントの進め方（ストイベ等）", value: "events" },
+  { name: "おすすめジョブ取得ロードマップ", value: "jobs" },
+  { name: "重要武器シリーズ（終末・オメガ等）", value: "weapons" },
+  { name: "ランク帯別の目標とやることリスト", value: "rank_guide" },
+  { name: "快適設定・倉庫整理・団活の基本", value: "tips" },
 ];
 
 const PUBLIC_OPTION: DiscordCommandOptionDefinition = {
